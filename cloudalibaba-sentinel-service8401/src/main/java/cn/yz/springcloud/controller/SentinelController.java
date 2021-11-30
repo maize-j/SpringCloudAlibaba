@@ -32,6 +32,7 @@ public class SentinelController {
     @SentinelResource(value = "testHotKey",blockHandler = "deal_testHotKey")
     public String testHotKey(@RequestParam(value = "p1",required = false) String P1,
                              @RequestParam(value = "p2",required = false) String p2){
+//        int a = 10/0;  //java运行时异常，SentinelResource不负责管理，不会到回调方法中
         return "------------testHotKey";
     }
 
