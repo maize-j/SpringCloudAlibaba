@@ -1,5 +1,7 @@
 # Sentinel
 
+sentinel和nacos一样，在服务停止后，立即注销服务
+
 pom
 
 ```xml
@@ -51,6 +53,8 @@ sentinel自身为懒加载机制，当服务配置了sentinel监控，但该服�
 
 ![](../img/sentinel/sentinel错误提示.png)
 
+如果想要自己指定回调方法，需要配合@SentinelResource使用，在该注解的blockHandler方法中指定回调方法。没有指定是用系统默认的，即Blocked by Sentinel（flow limiting）
+
 **关联**
 
 这里配置了testA关联testB，阈值类型是对被关联对象的限制，即对testB的限制，当testB达到阈值时，不对testB进行限流控制，而对testA进行限流
@@ -92,3 +96,28 @@ sentinel的熔断降级和hystrix非常相似。
 value属性对应页面配置中的资源名，blockHandler类似于hystrix中的fall_back回调方法，**SentinelResource从逻辑上一定要带上blockHandler方法，否则放出错的时候，错误将直接返回到页面。**
 
 还可以对特定的参数设置特定的值...详见官网吧...
+
+
+
+
+
+### 客户自定义限流全局处理
+
+前面介绍的限流的回调方法存在的问题：①系统提供的方法不仅没有去标签化，而且还体现不出业务需求；②每一个业务方法都需要一个回调方法，导致代码膨胀；③回调方法和业务代码耦合
+
+这里可以重新定义一个类，专门定义回调方法，并配合@SentinelResource注解的blockHandlerClass属性和blockHandler属性，表示使用blockHandlerClass中的blockHandler方法作为回调方法。
+
+```java
+@SentinelResource(value = "customerBlockHandler", blockHandlerClass = CustomerBlockHandler.class, blockHandler = "handlerException2")
+```
+
+这里在sentinel界面上配置流控的时候，需要使用value去配置，直接使用URL配置还是会使用系统默认的回调方法。（原因好像是sentinel在某个版本后默认收敛所有的URL入口，直接在页面配置是不生效的，需要在applicaltion中配置打开URL）-----好像不太对，加上这个配置后，sentinel不监控URL，只对配置了@SentinelResource.value的进行监控
+
+```yml
+spring:
+   cloud:
+     sentinel:
+       filter:
+         # 关闭链路收敛使链路收敛能够生效
+         enabled: false
+```
