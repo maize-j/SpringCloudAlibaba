@@ -1,0 +1,20 @@
+server:
+  port: 84
+spring:
+  application:
+    name: cloud-cosumer-order
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+    sentinel:
+      transport:
+        dashboard: localhost:8080
+        port: 8719
+
+feign:
+  sentinel:
+    enabled: true  #激活sentinel对feign的支持
+
+service-url:
+  nacos-user-service: http://cloud-privider-payment

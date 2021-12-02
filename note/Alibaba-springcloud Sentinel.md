@@ -55,6 +55,8 @@ sentinel自身为懒加载机制，当服务配置了sentinel监控，但该服�
 
 如果想要自己指定回调方法，需要配合@SentinelResource使用，在该注解的blockHandler方法中指定回调方法。没有指定是用系统默认的，即Blocked by Sentinel（flow limiting）
 
+blockHandler不负责管理java运行时异常，当代码中出现运行时异常时，不会进入回调返回发，blockHandler只负责管理在sentinel页面上配置的流控异常。
+
 **关联**
 
 这里配置了testA关联testB，阈值类型是对被关联对象的限制，即对testB的限制，当testB达到阈值时，不对testB进行限流控制，而对testA进行限流
@@ -105,7 +107,7 @@ value属性对应页面配置中的资源名，blockHandler类似于hystrix中�
 
 前面介绍的限流的回调方法存在的问题：①系统提供的方法不仅没有去标签化，而且还体现不出业务需求；②每一个业务方法都需要一个回调方法，导致代码膨胀；③回调方法和业务代码耦合
 
-这里可以重新定义一个类，专门定义回调方法，并配合@SentinelResource注解的blockHandlerClass属性和blockHandler属性，表示使用blockHandlerClass中的blockHandler方法作为回调方法。
+这里可以重新定义一个类，专门定义回调方法，并配合@SentinelResource注解的blockHandlerClass属性和blockHandler属性，表示使用blockHandlerClass中的blockHandler方法作为回调方法。（blockHandler不负责管理java运行时异常，当代码中出现运行时异常时，不会进入回调返回发，blockHandler只负责管理在sentinel页面上配置的流控。）
 
 ```java
 @SentinelResource(value = "customerBlockHandler", blockHandlerClass = CustomerBlockHandler.class, blockHandler = "handlerException2")
@@ -120,4 +122,83 @@ spring:
        filter:
          # 关闭链路收敛使链路收敛能够生效
          enabled: false
+```
+
+
+
+### sentinel异常处理
+
+前面blockHandler定义的回调方法只能处理页面配置的异常，当出现java运行时异常blockhandler方法是不处理的。fallback会处理java运行时异常：
+
+```java
+ @SentinelResource(value = "fallback",fallbackClass = FallbackHandler.class,fallback = "handlerFallback")
+```
+
+fallBack用法和Block几乎一样，由fallbackClass定义回调方法的类，fallback定义类中的回调方法。
+
+fallback和blockHandler可以同时定义，当出现java运行时异常，会调用fallback回调函数，出现sentinel配置异常，调用blockhandler定义的回调方法。
+
+\* **fallback回调方法和blockHandler回调方法定义的异常把不同，fallback回调方法上定义的参数类型为Throwable，blockHandler回调方法上定义的参数的类型为BlockException**
+
+fallback:
+
+```java
+ public static CommonResult fallBackHandler(Long id,Throwable exception){
+        Payment payment = new Payment(id, null);
+        CommonResult<Payment> paymentCommonResult = new CommonResult<>(444, "兜底异常HandlerFallBack，Exception：" + exception.getMessage(), payment);
+        return paymentCommonResult;
+    }
+```
+
+blockhandler:
+
+```java
+public CommonResult handlerFallback(@PathVariable Long id, BlockException exception){
+        Payment payment = new Payment(id, null);
+        return new CommonResult(444,"blockhandler："+exception.getMessage(),payment);
+    }
+```
+
+处理之外，sentinel还提供了异常忽略，即@SentinelResource注解的exceptionsToIgnore属性，该属性定义异常的类型，放方法中出现该类型是，不调用回调方法。
+
+
+
+
+
+### 引入Feign
+
+需要首先激活sentinel对feign的支持
+
+applicaltion.yml
+
+```yml
+feign:
+  sentinel:
+    enabled: true  #激活sentinel对feign的支持
+```
+
+使用几乎和hystrix的使用方法一模一样，定义service调用其他的服务，fallback绑定回调方法类
+
+```java
+@Service
+@FeignClient(value = "cloud-privider-payment",fallback = PaymentServiceImpl.class)
+public interface IPaymentService {
+    @GetMapping("/getById/{id}")
+    public CommonResult<Payment> getById(@PathVariable("id")Long id);
+}
+```
+
+定义回调方法类，实现该service接口，当出现异常时，会进入对应的回调方法。
+
+```java
+@Component
+public class PaymentServiceImpl implements IPaymentService {
+
+    @Override
+    public CommonResult<Payment> getById(Long id) {
+        Payment payment = new Payment(id, null);
+        CommonResult<Payment> paymentCommonResult = new CommonResult<>(444, "PaymentServiceImpl异常处理。", payment);
+        return paymentCommonResult;
+    }
+}
 ```
