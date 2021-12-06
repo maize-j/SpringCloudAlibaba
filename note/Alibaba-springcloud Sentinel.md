@@ -99,10 +99,6 @@ value属性对应页面配置中的资源名，blockHandler类似于hystrix中�
 
 还可以对特定的参数设置特定的值...详见官网吧...
 
-
-
-
-
 ### 客户自定义限流全局处理
 
 前面介绍的限流的回调方法存在的问题：①系统提供的方法不仅没有去标签化，而且还体现不出业务需求；②每一个业务方法都需要一个回调方法，导致代码膨胀；③回调方法和业务代码耦合
@@ -123,8 +119,6 @@ spring:
          # 关闭链路收敛使链路收敛能够生效
          enabled: false
 ```
-
-
 
 ### sentinel异常处理
 
@@ -160,10 +154,6 @@ public CommonResult handlerFallback(@PathVariable Long id, BlockException except
 ```
 
 处理之外，sentinel还提供了异常忽略，即@SentinelResource注解的exceptionsToIgnore属性，该属性定义异常的类型，放方法中出现该类型是，不调用回调方法。
-
-
-
-
 
 ### 引入Feign
 
@@ -202,3 +192,53 @@ public class PaymentServiceImpl implements IPaymentService {
     }
 }
 ```
+
+
+
+### sentinel持久化
+
+sentinel默认是没有持久化，在每一次服务重启后，之前所配置的信息全部没有了，需要重新再配置，因此可以将sentinel持久化进nacos中。
+
+添加依赖包：
+
+```xml
+<!--持久化，将sentinel持久化进nacos-->
+<dependency>
+    <groupId>com.alibaba.csp</groupId>
+    <artifactId>sentinel-datasource-nacos</artifactId>
+</dependency>
+```
+
+为sentinel添加数据源的配置：
+
+```yml
+spring:
+  cloud:
+    sentinel:
+      datasource:
+        ds1:
+          nacos:
+            server-addr: localhost:8848
+            dataId: alibaba-sentinel-server
+            groupId: DEFAULT_GROUP
+            data-type: json
+            rule-type: flow
+```
+
+在nacos中添加配置，格式为json
+
+```json
+[
+    {
+        "resource":"",  //资源名称，填写url
+        "limitApp":"",  //来源应用
+        "grade":1,  //阈值类型，0表示线程数，1表示QPS
+        "count":1,  //单机阈值
+        "strategy":0,   //流控模式，0表示直接，1表示关联，2表示链路
+        "controlBehavior":0,  //流控效果，0表示快速失败，1表示warm up，2表示排队等待
+        "clusterMode":false  //是否集群
+    }
+]
+```
+
+这样服务在重启之后，sentinel中也有配置。（在服务关闭的时候，是没有的），不过这种持久化的方式有一些不够人性化，当有很多URL需要监控并且持久化的话，需要为每一个URL都编写一个json串，而且比较容易出错。。。。

@@ -13,6 +13,14 @@ spring:
         dashboard: localhost:8080
         #默认8719端口，如果端口号被占用，自动从8719依次+1扫描，知道找到可用端口号
         port: 8719
+      datasource: #为sentinel添加数据源配置
+        ds1:
+          nacos:
+            server-addr: localhost:8848
+            dataId: alibaba-sentinel-server  #${spring.application.name}
+            groupId: DEFAULT_GROUP
+            data-type: json
+            rule-type: flow
       filter:
         # 关闭链路收敛使链路收敛能够生效
         enabled: false
