@@ -193,8 +193,6 @@ public class PaymentServiceImpl implements IPaymentService {
 }
 ```
 
-
-
 ### sentinel持久化
 
 sentinel默认是没有持久化，在每一次服务重启后，之前所配置的信息全部没有了，需要重新再配置，因此可以将sentinel持久化进nacos中。
